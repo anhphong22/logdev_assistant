@@ -28,7 +28,6 @@ from . import shared
 if TYPE_CHECKING:
     from typing import TypedDict
 
-
     class DataframeData(TypedDict):
         headers: List[str]
         data: List[List[str | int | bool]]
@@ -76,7 +75,7 @@ def normalize_markdown(md_text: str) -> str:
             normalized_lines.append(line)
         elif inside_list and line.strip() == "":
             if i < len(lines) - 1 and not re.match(
-                    r"^(\d+\.|-|\*|\+)\s", lines[i + 1].strip()
+                r"^(\d+\.|-|\*|\+)\s", lines[i + 1].strip()
             ):
                 normalized_lines.append(line)
             continue
@@ -112,8 +111,8 @@ def convert_mdtext(md_text):
 
 def convert_asis(userinput):
     return (
-            f'<p style="white-space:pre-wrap;">{html.escape(userinput)}</p>'
-            + ALREADY_CONVERTED_MARK
+        f'<p style="white-space:pre-wrap;">{html.escape(userinput)}</p>'
+        + ALREADY_CONVERTED_MARK
     )
 
 
@@ -130,7 +129,7 @@ def detect_language(code):
     else:
         first_line = code.strip().split("\n", 1)[0]
     language = first_line.lower() if first_line else ""
-    code_without_language = code[len(first_line):].lstrip() if first_line else code
+    code_without_language = code[len(first_line) :].lstrip() if first_line else code
     return language, code_without_language
 
 
@@ -162,7 +161,9 @@ def save_file(filename, system, history, chatbot, user_name):
         md_s = f"system: \n- {system} \n"
         for data in history:
             md_s += f"\n{data['role']}: \n- {data['content']} \n"
-        with open(os.path.join(HISTORY_DIR, user_name, filename), "w", encoding="utf8") as f:
+        with open(
+            os.path.join(HISTORY_DIR, user_name, filename), "w", encoding="utf8"
+        ) as f:
             f.write(md_s)
     logging.debug(f"{user_name}'s conversation history saved")
     return os.path.join(HISTORY_DIR, user_name, filename)
@@ -170,7 +171,8 @@ def save_file(filename, system, history, chatbot, user_name):
 
 def get_file_names(directory: Union[str, Path] = None, plain=False, filetypes=None):
     logging.debug(
-        f"Get a list of file names, the directory is {directory}, the file type is {filetypes}, whether it is a plain text list {plain}")
+        f"Get a list of file names, the directory is {directory}, the file type is {filetypes}, whether it is a plain text list {plain}"
+    )
     if filetypes is None:
         filetypes = [".json"]
     files = []
@@ -196,7 +198,8 @@ def get_history_names(plain=False, user_name=""):
 def load_template(filename, mode=0):
     logging.debug(
         f"Load the template file {filename}, the mode is {mode} (0 is to return the dictionary and drop-down menu, "
-        f"1 is to return the drop-down menu, 2 is to return the dictionary)")
+        f"1 is to return the drop-down menu, 2 is to return the dictionary)"
+    )
     lines = []
     if filename.endswith(".json"):
         with open(os.path.join(TEMPLATES_DIR, filename), "r", encoding="utf8") as f:
@@ -204,7 +207,7 @@ def load_template(filename, mode=0):
         lines = [[i["act"], i["prompt"]] for i in lines]
     else:
         with open(
-                os.path.join(TEMPLATES_DIR, filename), "r", encoding="utf8"
+            os.path.join(TEMPLATES_DIR, filename), "r", encoding="utf8"
         ) as csvfile:
             reader = csv.reader(csvfile)
             lines = list(reader)
@@ -227,7 +230,9 @@ def get_template_names(plain=False):
 
 
 def get_template_content(templates, selection, original_system_prompt):
-    logging.debug(f"In the application template, the selection is {selection}, and the original system prompt is {original_system_prompt}")
+    logging.debug(
+        f"In the application template, the selection is {selection}, and the original system prompt is {original_system_prompt}"
+    )
     try:
         return templates[selection]
     except:
@@ -242,7 +247,11 @@ def reset_textbox():
 def reset_default():
     default_host = shared.state.reset_api_host()
     retrieve_proxy("")
-    return gr.update(value=default_host), gr.update(value=""), "API-Host and proxy reset"
+    return (
+        gr.update(value=default_host),
+        gr.update(value=""),
+        "API-Host and proxy reset",
+    )
 
 
 def change_api_host(host):
@@ -294,9 +303,7 @@ def get_geoip():
     if "error" in data.keys():
         logging.warning(f"Unable to obtain IP address information. \n{data}")
         if data["reason"] == "RateLimited":
-            return (
-                f"Getting IP geolocation failed because the rate limit for detecting IP was reached. Chat functionality may still be available."
-            )
+            return f"Getting IP geolocation failed because the rate limit for detecting IP was reached. Chat functionality may still be available."
         else:
             return f"Failed to obtain IP geolocation. Reason: {data['reason']}. You can still use the chat function."
     else:
@@ -356,15 +363,24 @@ def run(command, desc=None, errdesc=None, custom_env=None, live=False):
     if desc is not None:
         print(desc)
     if live:
-        result = subprocess.run(command, shell=True, env=os.environ if custom_env is None else custom_env)
+        result = subprocess.run(
+            command, shell=True, env=os.environ if custom_env is None else custom_env
+        )
         if result.returncode != 0:
-            raise RuntimeError(f"""{errdesc or 'Error running command'}.
+            raise RuntimeError(
+                f"""{errdesc or 'Error running command'}.
 Command: {command}
-Error code: {result.returncode}""")
+Error code: {result.returncode}"""
+            )
 
         return ""
-    result = subprocess.run(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True,
-                            env=os.environ if custom_env is None else custom_env)
+    result = subprocess.run(
+        command,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        shell=True,
+        env=os.environ if custom_env is None else custom_env,
+    )
     if result.returncode != 0:
         message = f"""{errdesc or 'Error running command'}.
 Command: {command}
@@ -377,7 +393,7 @@ stderr: {result.stderr.decode(encoding="utf8", errors="ignore") if len(result.st
 
 
 def versions_html():
-    git = os.environ.get('GIT', "git")
+    git = os.environ.get("GIT", "git")
     python_version = ".".join([str(x) for x in sys.version_info[0:3]])
     try:
         commit_hash = run(f"{git} rev-parse HEAD").strip()
@@ -385,7 +401,7 @@ def versions_html():
         commit_hash = "<none>"
     if commit_hash != "<none>":
         short_commit = commit_hash[0:7]
-        commit_info = f"<a style=\"text-decoration:none\" href=\"https://github.com/anhphong22/logdev_assistant/commit/{short_commit}\">{short_commit}</a>"
+        commit_info = f'<a style="text-decoration:none" href="https://github.com/anhphong22/logdev_assistant/commit/{short_commit}">{short_commit}</a>'
     else:
         commit_info = "unknown \U0001F615"
     return f"""
@@ -399,7 +415,10 @@ Commit: {commit_info}
 
 def add_source_numbers(lst, source_name="Source", use_source=True):
     if use_source:
-        return [f'[{idx + 1}]\t "{item[0]}"\n{source_name}: {item[1]}' for idx, item in enumerate(lst)]
+        return [
+            f'[{idx + 1}]\t "{item[0]}"\n{source_name}: {item[1]}'
+            for idx, item in enumerate(lst)
+        ]
     else:
         return [f'[{idx + 1}]\t "{item}"' for idx, item in enumerate(lst)]
 
@@ -408,9 +427,7 @@ def add_details(lst):
     nodes = []
     for index, txt in enumerate(lst):
         brief = txt[:25].replace("\n", "")
-        nodes.append(
-            f"<details><summary>{brief}...</summary><p>{txt}</p></details>"
-        )
+        nodes.append(f"<details><summary>{brief}...</summary><p>{txt}</p></details>")
     return nodes
 
 
@@ -428,7 +445,7 @@ def sheet_to_string(sheet):
 
 def excel_to_string(file_path):
     # Read all worksheets in the Excel file
-    excel_file = pd.read_excel(file_path, engine='openpyxl', sheet_name=None)
+    excel_file = pd.read_excel(file_path, engine="openpyxl", sheet_name=None)
 
     # Initialize result string
     result = []

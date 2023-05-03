@@ -1,14 +1,9 @@
 import hashlib
-import os
 import logging
+import os
 
-from llama_index import download_loader
-from llama_index import (
-    Document,
-    LLMPredictor,
-    PromptHelper
-)
 import PyPDF2
+from llama_index import Document, LLMPredictor, PromptHelper, download_loader
 from tqdm import tqdm
 
 from logdev.config import local_embedding, retrieve_proxy
@@ -49,8 +44,8 @@ def get_documents(file_src):
             if file_type == ".pdf":
                 logging.debug("Loading PDF...")
                 try:
-                    from logdev.pdf_func import parse_pdf
                     from logdev.config import advance_docs
+                    from logdev.pdf_func import parse_pdf
 
                     two_column = advance_docs["pdf"].get("two_column", False)
                     pdftext = parse_pdf(filepath, two_column).text
@@ -93,18 +88,23 @@ def get_documents(file_src):
 
 
 def construct_index(
-        api_key,
-        file_src,
-        max_input_size=4096,
-        num_outputs=5,
-        max_chunk_overlap=20,
-        chunk_size_limit=600,
-        embedding_limit=None,
-        separator=" ",
+    api_key,
+    file_src,
+    max_input_size=4096,
+    num_outputs=5,
+    max_chunk_overlap=20,
+    chunk_size_limit=600,
+    embedding_limit=None,
+    separator=" ",
 ):
     from langchain.chat_models import ChatOpenAI
     from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-    from llama_index import GPTSimpleVectorIndex, ServiceContext, LangchainEmbedding, OpenAIEmbedding
+    from llama_index import (
+        GPTSimpleVectorIndex,
+        LangchainEmbedding,
+        OpenAIEmbedding,
+        ServiceContext,
+    )
 
     if api_key:
         os.environ["OPENAI_API_KEY"] = api_key

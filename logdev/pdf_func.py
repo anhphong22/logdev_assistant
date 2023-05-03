@@ -1,6 +1,7 @@
-from types import SimpleNamespace
-import pdfplumber
 import logging
+from types import SimpleNamespace
+
+import pdfplumber
 from llama_index import Document
 
 
@@ -31,11 +32,16 @@ def prepare_table_config(crop_page):
 
 def get_text_outside_table(crop_page):
     ts = prepare_table_config(crop_page)
-    if len(ts["explicit_vertical_lines"]) == 0 or len(ts["explicit_horizontal_lines"]) == 0:
+    if (
+        len(ts["explicit_vertical_lines"]) == 0
+        or len(ts["explicit_horizontal_lines"]) == 0
+    ):
         return crop_page
 
     # Get the bounding boxes of the tables on the page.
-    bboxes = [table.bbox for table in crop_page.root_page.find_tables(table_settings=ts)]
+    bboxes = [
+        table.bbox for table in crop_page.root_page.find_tables(table_settings=ts)
+    ]
 
     def not_within_bboxes(obj):
         """Check if the object is in any of the table's bbox."""
@@ -45,7 +51,9 @@ def get_text_outside_table(crop_page):
             v_mid = (obj["top"] + obj["bottom"]) / 2
             h_mid = (obj["x0"] + obj["x1"]) / 2
             x0, top, x1, bottom = _bbox
-            return (h_mid >= x0) and (h_mid < x1) and (v_mid >= top) and (v_mid < bottom)
+            return (
+                (h_mid >= x0) and (h_mid < x1) and (v_mid >= top) and (v_mid < bottom)
+            )
 
         return not any(obj_in_bbox(__bbox) for __bbox in bboxes)
 
@@ -53,11 +61,16 @@ def get_text_outside_table(crop_page):
 
 
 # Please use LaTeX to express the formula, the formula in the line is wrapped with $, and the formula between the lines is wrapped with $$
-extract_words = lambda page: page.extract_words(keep_blank_chars=True, y_tolerance=0, x_tolerance=1,
-                                                extra_attrs=["fontname", "size", "object_type"])
+extract_words = lambda page: page.extract_words(
+    keep_blank_chars=True,
+    y_tolerance=0,
+    x_tolerance=1,
+    extra_attrs=["fontname", "size", "object_type"],
+)
 
 
 # dict_keys(['text', 'x0', 'x1', 'top', 'doctop', 'bottom', 'upright', 'direction', 'fontname', 'size'])
+
 
 def get_title_with_cropped_page(first_page):
     # handle headers
@@ -75,7 +88,10 @@ def get_title_with_cropped_page(first_page):
         elif word.text == "Abstract":
             top = word.top
 
-    user_info = [i["text"] for i in extract_words(first_page.within_bbox((x0, title_bottom, x1, top)))]
+    user_info = [
+        i["text"]
+        for i in extract_words(first_page.within_bbox((x0, title_bottom, x1, top)))
+    ]
     # Crop the upper half, within_bbox: full_included; crop: partial_included
     return title, user_info, first_page.within_bbox((x0, top, x1, bottom))
 
@@ -85,7 +101,9 @@ def get_column_cropped_pages(pages, two_column=True):
     for page in pages:
         if two_column:
             left = page.within_bbox((0, 0, page.width / 2, page.height), relative=True)
-            right = page.within_bbox((page.width / 2, 0, page.width, page.height), relative=True)
+            right = page.within_bbox(
+                (page.width / 2, 0, page.width, page.height), relative=True
+            )
             new_pages.append(left)
             new_pages.append(right)
         else:
@@ -110,10 +128,8 @@ def parse_pdf(filename, two_column=True):
             name_top=name_top,
             name_bottom=name_bottom,
             record_chapter_name=True,
-
             page_start=page_start,
             page_stop=None,
-
             text=[],
         )
         cur_chapter = None
@@ -128,7 +144,9 @@ def parse_pdf(filename, two_column=True):
                     if cur_chapter is None:
                         cur_chapter = _chapter(page.page_number, word.top, word.bottom)
                     elif not cur_chapter.record_chapter_name or (
-                            cur_chapter.name_bottom != cur_chapter.name_bottom and cur_chapter.name_top != cur_chapter.name_top):
+                        cur_chapter.name_bottom != cur_chapter.name_bottom
+                        and cur_chapter.name_top != cur_chapter.name_top
+                    ):
                         cur_chapter.page_stop = page.page_number  # stop id
                         chapters.append(cur_chapter)
                         cur_chapter = _chapter(page.page_number, word.top, word.bottom)
@@ -143,7 +161,9 @@ def parse_pdf(filename, two_column=True):
             chapters.append(cur_chapter)
 
         for i in chapters:
-            logging.info(f"section: {i.name} pages:{i.page_start, i.page_stop} word-count:{len(i.text)}")
+            logging.info(
+                f"section: {i.name} pages:{i.page_start, i.page_stop} word-count:{len(i.text)}"
+            )
             logging.debug(" ".join(i.text))
 
     title = " ".join(title)

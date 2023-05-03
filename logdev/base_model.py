@@ -11,11 +11,19 @@ from duckduckgo_search import ddg
 from llama_index import PromptHelper
 
 from logdev import shared
-from logdev.config import retrieve_proxy, local_embedding
+from logdev.config import local_embedding, retrieve_proxy
 from logdev.constants import *  # noqa: F401
 from logdev.llama_func import construct_index
-from logdev.utils import construct_assistant, construct_user, count_token, save_file, hide_middle_chars, \
-    add_source_numbers, replace_today, add_details
+from logdev.utils import (
+    add_details,
+    add_source_numbers,
+    construct_assistant,
+    construct_user,
+    count_token,
+    hide_middle_chars,
+    replace_today,
+    save_file,
+)
 
 
 class ModelType(Enum):
@@ -41,18 +49,18 @@ class ModelType(Enum):
 
 class BaseLLMModel:
     def __init__(
-            self,
-            model_name,
-            system_prompt="",
-            temperature=1.0,
-            top_p=1.0,
-            n_choices=1,
-            stop=None,
-            max_generation_token=None,
-            presence_penalty=0,
-            frequency_penalty=0,
-            logit_bias=None,
-            user="",
+        self,
+        model_name,
+        system_prompt="",
+        temperature=1.0,
+        top_p=1.0,
+        n_choices=1,
+        stop=None,
+        max_generation_token=None,
+        presence_penalty=0,
+        frequency_penalty=0,
+        logit_bias=None,
+        user="",
     ) -> None:
         self.history = []
         self.all_token_counts = []
@@ -159,22 +167,25 @@ class BaseLLMModel:
         return chatbot, status_text
 
     def predict(
-            self,
-            inputs,
-            chatbot,
-            stream=False,
-            use_websearch=False,
-            files=None,
-            reply_language="vi",
-            should_check_token_count=True,
+        self,
+        inputs,
+        chatbot,
+        stream=False,
+        use_websearch=False,
+        files=None,
+        reply_language="vi",
+        should_check_token_count=True,
     ):  # repetition_penalty, top_k
         from langchain.chat_models import ChatOpenAI
         from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-        from llama_index import (GPTSimpleVectorIndex, LangchainEmbedding,
-                                 OpenAIEmbedding, ServiceContext)
+        from llama_index import (
+            GPTSimpleVectorIndex,
+            LangchainEmbedding,
+            OpenAIEmbedding,
+            ServiceContext,
+        )
         from llama_index.indices.query.schema import QueryBundle
-        from llama_index.indices.vector_store.base_query import \
-            GPTVectorStoreIndexQuery
+        from llama_index.indices.vector_store.base_query import GPTVectorStoreIndexQuery
 
         logging.info(
             "Enter：" + colorama.Fore.BLUE + f"{inputs}" + colorama.Style.RESET_ALL
@@ -258,9 +269,9 @@ class BaseLLMModel:
             display_reference = ""
 
         if (
-                self.need_api_key
-                and self.api_key is None
-                and not shared.state.multi_api_key
+            self.need_api_key
+            and self.api_key is None
+            and not shared.state.multi_api_key
         ):
             status_text = STANDARD_ERROR_MSG + NO_APIKEY_MSG
             logging.info(status_text)
@@ -322,9 +333,9 @@ class BaseLLMModel:
         if sum(self.all_token_counts) > max_token and should_check_token_count:
             count = 0
             while (
-                    sum(self.all_token_counts)
-                    > self.token_upper_limit * REDUCE_TOKEN_FACTOR
-                    and sum(self.all_token_counts) > 0
+                sum(self.all_token_counts)
+                > self.token_upper_limit * REDUCE_TOKEN_FACTOR
+                and sum(self.all_token_counts) > 0
             ):
                 count += 1
                 del self.all_token_counts[0]
@@ -334,12 +345,12 @@ class BaseLLMModel:
             yield chatbot, status_text
 
     def retry(
-            self,
-            chatbot,
-            stream=False,
-            use_websearch=False,
-            files=None,
-            reply_language="Vietnamese",
+        self,
+        chatbot,
+        stream=False,
+        use_websearch=False,
+        files=None,
+        reply_language="Vietnamese",
     ):
         logging.debug("Retrying...")
         if len(self.history) == 0:
