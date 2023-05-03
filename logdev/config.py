@@ -1,8 +1,9 @@
+import logging
+import os
+import sys
 from collections import defaultdict
 from contextlib import contextmanager
-import os
-import logging
-import sys
+
 import commentjson as json
 
 from . import shared
@@ -22,7 +23,7 @@ __all__ = [
 # Add a unified config file to avoid confusion caused by too many files (the lowest priority)
 # At the same time, it can also provide config help for subsequent support for custom functions
 if os.path.exists("config.json"):
-    with open("config.json", "r", encoding='utf-8') as f:
+    with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
 else:
     config = {}
@@ -32,23 +33,25 @@ if os.path.exists("api_key.txt"):
     with open("api_key.txt", "r") as f:
         config["openai_api_key"] = f.read().strip()
     os.rename("api_key.txt", "api_key(deprecated).txt")
-    with open("config.json", "w", encoding='utf-8') as f:
+    with open("config.json", "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
 
 if os.path.exists("auth.json"):
     logging.info("auth.json file detected, migration in progress...")
     auth_list = []
-    with open("auth.json", "r", encoding='utf-8') as f:
+    with open("auth.json", "r", encoding="utf-8") as f:
         auth = json.load(f)
         for _ in auth:
             if auth[_]["username"] and auth[_]["password"]:
                 auth_list.append((auth[_]["username"], auth[_]["password"]))
             else:
-                logging.error("Please check the username and password in the `auth.json` file!")
+                logging.error(
+                    "Please check the username and password in the `auth.json` file!"
+                )
                 sys.exit(1)
     config["users"] = auth_list
     os.rename("auth.json", "auth(deprecated).json")
-    with open("config.json", "w", encoding='utf-8') as f:
+    with open("config.json", "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
 
 # Dealing with docker if we are running in Docker
@@ -61,11 +64,15 @@ my_api_key = config.get("openai_api_key", "")
 my_api_key = os.environ.get("my_api_key", my_api_key)
 
 # Multi-account mechanism
-multi_api_key = config.get("multi_api_key", False)  # Whether to enable the multi-account mechanism
+multi_api_key = config.get(
+    "multi_api_key", False
+)  # Whether to enable the multi-account mechanism
 if multi_api_key:
     api_key_list = config.get("api_key_list", [])
     if len(api_key_list) == 0:
-        logging.error("The multi-account mode is enabled, but the `api_key_list` is empty, please check `config.json`")
+        logging.error(
+            "The multi-account mode is enabled, but the `api_key_list` is empty, please check `config.json`"
+        )
         sys.exit(1)
     shared.state.set_api_key_queue(api_key_list)
 
