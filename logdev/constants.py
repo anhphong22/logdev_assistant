@@ -1,7 +1,9 @@
 # -*- coding:utf-8 -*-
 import os
 from pathlib import Path
+
 import gradio as gr
+
 from logdev.webui_locale import I18nAuto
 
 i18n = I18nAuto()
@@ -23,17 +25,27 @@ TEMPLATES_DIR = "templates"
 
 # error message
 STANDARD_ERROR_MSG = i18n("☹️An error occurred:")  # Standard prefix for error messages
-GENERAL_ERROR_MSG = i18n("An error occurred while getting the dialog, please check the background log")
-ERROR_RETRIEVE_MSG = i18n("Please check the network connection, or whether the API-Key is valid.")
-CONNECTION_TIMEOUT_MSG = i18n("The connection timed out, unable to get the conversation.")  # Connection timed out
+GENERAL_ERROR_MSG = i18n(
+    "An error occurred while getting the dialog, please check the background log"
+)
+ERROR_RETRIEVE_MSG = i18n(
+    "Please check the network connection, or whether the API-Key is valid."
+)
+CONNECTION_TIMEOUT_MSG = i18n(
+    "The connection timed out, unable to get the conversation."
+)  # Connection timed out
 READ_TIMEOUT_MSG = i18n("Read timeout, unable to get conversation.")  # Read timeout
 PROXY_ERROR_MSG = i18n("Proxy error, unable to get conversation.")  # Proxy error
 SSL_ERROR_PROMPT = i18n("SSL error, unable to get session.")  # SSL error
 NO_APIKEY_MSG = i18n(
-    "The API key is empty, please check whether the input is correct.")  # The length of the API key is less than 51 digits
-NO_INPUT_MSG = i18n("Please enter the dialogue content.")  # No dialogue content is entered
+    "The API key is empty, please check whether the input is correct."
+)  # The length of the API key is less than 51 digits
+NO_INPUT_MSG = i18n(
+    "Please enter the dialogue content."
+)  # No dialogue content is entered
 BILLING_NOT_APPLICABLE_MSG = i18n(
-    "Billing information is not applicable")  # The billing information returned by the locally running model
+    "Billing information is not applicable"
+)  # The billing information returned by the locally running model
 
 TIMEOUT_STREAMING = 60  # Timeout for streaming conversations
 TIMEOUT_ALL = 200  # Timeout for non-streaming conversations
@@ -50,15 +62,19 @@ LOGDEV_DESCRIPTION = i18n("Developed by LogDevHAF Team")
 
 FOOTER = """<div class="versions">{versions}</div>"""
 
-APPEARANCE_SWITCHER = """
+APPEARANCE_SWITCHER = (
+    """
 <div style="display: flex; justify-content: space-between;">
-<span style="margin-top: 4px !important;">""" + i18n("Toggle light and dark theme") + """</span>
+<span style="margin-top: 4px !important;">"""
+    + i18n("Toggle light and dark theme")
+    + """</span>
 <span><label class="apSwitch" for="checkbox">
      <input type="checkbox" id="checkbox">
      <div class="apSlider"></div>
 </label></span>
 </div>
 """
+)
 
 SUMMARIZE_PROMPT = "Who are you? What did we just talk about?"  # prompt when summarizing the conversation
 
@@ -84,7 +100,7 @@ LOCAL_MODELS = [
     "llama-65b-hf",
 ]
 
-if os.environ.get('HIDE_LOCAL_MODELS', 'false') == 'true':
+if os.environ.get("HIDE_LOCAL_MODELS", "false") == "true":
     MODELS = ONLINE_MODELS
 else:
     MODELS = ONLINE_MODELS + LOCAL_MODELS
@@ -105,7 +121,7 @@ MODEL_TOKEN_LIMIT = {
     "gpt-4": 8192,
     "gpt-4-0314": 8192,
     "gpt-4-32k": 32768,
-    "gpt-4-32k-0314": 32768
+    "gpt-4-32k-0314": 32768,
 }
 
 TOKEN_OFFSET = 1000  # Subtract this value from the token upper limit of the model to get the soft upper limit. After reaching the soft cap, it will automatically try to reduce token usage.
@@ -120,7 +136,7 @@ REPLY_LANGUAGES = [
     "Español",
     "Français",
     "Deutsch",
-    "follow problem language (unstable)"
+    "follow problem language (unstable)",
 ]
 
 WEBSEARCH_PTOMPT_TEMPLATE = """\
