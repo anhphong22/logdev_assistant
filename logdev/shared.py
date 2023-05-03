@@ -1,7 +1,8 @@
 import os
 import queue
 
-from logdev.constants import BALANCE_API_URL, COMPLETION_URL, USAGE_API_URL, API_HOST
+from logdev.constants import (API_HOST, BALANCE_API_URL, COMPLETION_URL,
+                              USAGE_API_URL)
 
 
 class State:
