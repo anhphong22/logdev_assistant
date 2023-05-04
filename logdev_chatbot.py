@@ -38,7 +38,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
     with gr.Row().style(equal_height=True):
         with gr.Column(scale=5):
             with gr.Row():
-                chatbot = gr.Chatbot(elem_id="LOGDEV_chatbot").style(height="100%")
+                chatbot = gr.Chatbot(elem_id="LOGDEV_chatbot").style(height=500)
             with gr.Row():
                 with gr.Column(min_width=225, scale=12):
                     user_input = gr.Textbox(
