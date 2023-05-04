@@ -1,0 +1,23 @@
+{
+     "openai_api_key": "",
+     "usage_limit": 120,
+     "xmchat_api_key": "",
+     "language": "auto",
+     "render_latex": false,
+     "users": [],
+     "local_embedding": false,
+     "hide_history_when_not_logged_in": false,
+     "default_model": "gpt-3.5-turbo",
+     "advance_docs": {
+         "pdf": {
+             "two_column": false,
+             "formula_ocr": true
+         }
+     },
+     "multi_api_key": true,
+     "api_key_list": [
+       "sk-xxxxxxxxxxxxxxxxxxxxxxx",
+       "sk-xxxxxxxxxxxxxxxxxxxxxxx",
+       "sk-xxxxxxxxxxxxxxxxxxxxxxx"
+     ]
+}
