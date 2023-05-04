@@ -136,7 +136,7 @@ with gr.Blocks(css=customCSS, theme=small_and_beautiful_theme) as demo:
                                         multiselect=False,
                                     ).style(container=False)
 
-                with gr.Tab(label=i18n("Save/Loa")):
+                with gr.Tab(label=i18n("Save/Load")):
                     with gr.Accordion(label=i18n("Save/Load Dialog History"), open=True):
                         with gr.Column():
                             with gr.Row():
@@ -487,7 +487,7 @@ if __name__ == "__main__":
         share=share,
         auth=auth_list if authflag else None,
         favicon_path="./assets/favicon.ico",
-        inbrowser=not dockerflag,
+        inbrowser=not dockerflag
     )
     # demo.queue(concurrency_count=CONCURRENT_COUNT).launch(server_name="0.0.0.0", server_port=7860, share=False) # Customizable port
     # demo.queue(concurrency_count=CONCURRENT_COUNT).launch(server_name="0.0.0.0", server_port=7860,auth=("Fill in username here", "Fill in password here")) # Username and password can be set
