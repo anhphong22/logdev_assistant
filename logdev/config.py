@@ -1,8 +1,9 @@
+import logging
+import os
+import sys
 from collections import defaultdict
 from contextlib import contextmanager
-import os
-import logging
-import sys
+
 import commentjson as json
 
 __all__ = [
@@ -20,13 +21,13 @@ __all__ = [
     "server_name",
     "server_port",
     "share",
-    "hide_history_when_not_logged_in"
+    "hide_history_when_not_logged_in",
 ]
 
-from logdev import shared, constants
+from logdev import constants, shared
 
 if os.path.exists("config.json"):
-    with open("config.json", "r", encoding='utf-8') as f:
+    with open("config.json", "r", encoding="utf-8") as f:
         config = json.load(f)
 else:
     config = {}
@@ -41,23 +42,25 @@ if os.path.exists("api_key.txt"):
     with open("api_key.txt", "r") as f:
         config["openai_api_key"] = f.read().strip()
     os.rename("api_key.txt", "api_key(deprecated).txt")
-    with open("config.json", "w", encoding='utf-8') as f:
+    with open("config.json", "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
 
 if os.path.exists("auth.json"):
     logging.info("auth.json file detected, migration in progress...")
     auth_list = []
-    with open("auth.json", "r", encoding='utf-8') as f:
+    with open("auth.json", "r", encoding="utf-8") as f:
         auth = json.load(f)
         for _ in auth:
             if auth[_]["username"] and auth[_]["password"]:
                 auth_list.append((auth[_]["username"], auth[_]["password"]))
             else:
-                logging.error("Please check the username and password in the auth.json file!")
+                logging.error(
+                    "Please check the username and password in the auth.json file!"
+                )
                 sys.exit(1)
     config["users"] = auth_list
     os.rename("auth.json", "auth(deprecated).json")
-    with open("config.json", "w", encoding='utf-8') as f:
+    with open("config.json", "w", encoding="utf-8") as f:
         json.dump(config, f, indent=4)
 
 # Dealing with docker if we are running in Docker
@@ -84,7 +87,9 @@ multi_api_key = config.get("multi_api_key", False)
 if multi_api_key:
     api_key_list = config.get("api_key_list", [])
     if len(api_key_list) == 0:
-        logging.error("The multi-account mode is enabled, but the api_key_list is empty, please check config.json")
+        logging.error(
+            "The multi-account mode is enabled, but the api_key_list is empty, please check config.json"
+        )
         sys.exit(1)
     shared.state.set_api_key_queue(api_key_list)
 
@@ -127,8 +132,8 @@ local_embedding = config.get("local_embedding", False)
 @contextmanager
 def retrieve_proxy(proxy=None):
     """
-     1. If proxy = NONE, set the environment variable and return the latest set proxy
-     2. If proxy! = NONE, update the current proxy configuration, but do not update environment variables
+    1. If proxy = NONE, set the environment variable and return the latest set proxy
+    2. If proxy! = NONE, update the current proxy configuration, but do not update environment variables
     """
     global http_proxy, https_proxy
     if proxy is not None:
@@ -167,7 +172,9 @@ if server_port is None:
     if dockerflag:
         server_port = 7860
 
-assert server_port is None or type(server_port) == int, "requires `port` to be set to int type"
+assert (
+    server_port is None or type(server_port) == int
+), "requires `port` to be set to int type"
 
 
 default_model = config.get("default_model", "")

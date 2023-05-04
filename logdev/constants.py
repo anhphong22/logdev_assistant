@@ -85,22 +85,16 @@ ONLINE_MODELS = [
     "gpt-4-0314",
     "gpt-4-32k",
     "gpt-4-32k-0314",
-    "xmchat",
 ]
 
 LOCAL_MODELS = [
-    "chatglm-6b",
-    "chatglm-6b-int4",
-    "chatglm-6b-int4-qe",
-    "StableLM",
-    "MOSS",
     "llama-7b-hf",
     "llama-13b-hf",
     "llama-30b-hf",
     "llama-65b-hf",
 ]
 
-if os.environ.get("HIDE_LOCAL_MODELS", "false") == "true":
+if os.environ.get("HIDE_LOCAL_MODELS", "false") == "false":
     MODELS = ONLINE_MODELS
 else:
     MODELS = ONLINE_MODELS + LOCAL_MODELS
@@ -129,13 +123,8 @@ DEFAULT_TOKEN_LIMIT = 3000  # Default token upper limit
 REDUCE_TOKEN_FACTOR = 0.5  # Multiply with the model token upper limit to get the target token number. When reducing token occupancy, reduce token occupancy below the target token number.
 
 REPLY_LANGUAGES = [
-    "Simplified Chinese",
-    "traditional Chinese",
+    "Vietnamese",
     "English",
-    "Japanese",
-    "Español",
-    "Français",
-    "Deutsch",
     "follow problem language (unstable)",
 ]
 
