@@ -9,9 +9,8 @@ import logging
 import re
 import subprocess
 import sys
-from typing import TYPE_CHECKING, List, Union
+from typing import TYPE_CHECKING, List
 
-import mdtex2html
 import pandas as pd
 import requests
 import tiktoken
@@ -19,11 +18,11 @@ from markdown import markdown
 from pygments import highlight
 from pygments.formatters import HtmlFormatter
 from pygments.lexers import get_lexer_by_name
+from pypinyin import lazy_pinyin
 
-from logdev.config import retrieve_proxy
+from logdev import shared
+from logdev.config import hide_history_when_not_logged_in, retrieve_proxy
 from logdev.constants import *
-
-from . import shared
 
 if TYPE_CHECKING:
     from typing import TypedDict
@@ -31,6 +30,122 @@ if TYPE_CHECKING:
     class DataframeData(TypedDict):
         headers: List[str]
         data: List[List[str | int | bool]]
+
+
+def predict(current_model, *args):
+    iters = current_model.predict(*args)
+    for i in iters:
+        yield i
+
+
+def billing_info(current_model):
+    return current_model.billing_info()
+
+
+def set_key(current_model, *args):
+    return current_model.set_key(*args)
+
+
+def load_chat_history(current_model, *args):
+    return current_model.load_chat_history(*args)
+
+
+def interrupt(current_model, *args):
+    return current_model.interrupt(*args)
+
+
+def reset(current_model, *args):
+    return current_model.reset(*args)
+
+
+def retry(current_model, *args):
+    iters = current_model.retry(*args)
+    for i in iters:
+        yield i
+
+
+def delete_first_conversation(current_model, *args):
+    return current_model.delete_first_conversation(*args)
+
+
+def delete_last_conversation(current_model, *args):
+    return current_model.delete_last_conversation(*args)
+
+
+def set_system_prompt(current_model, *args):
+    return current_model.set_system_prompt(*args)
+
+
+def save_chat_history(current_model, *args):
+    return current_model.save_chat_history(*args)
+
+
+def export_markdown(current_model, *args):
+    return current_model.export_markdown(*args)
+
+
+def load_chat_history(current_model, *args):
+    return current_model.load_chat_history(*args)
+
+
+def upload_chat_history(current_model, *args):
+    return current_model.load_chat_history(*args)
+
+
+def set_token_upper_limit(current_model, *args):
+    return current_model.set_token_upper_limit(*args)
+
+
+def set_temperature(current_model, *args):
+    current_model.set_temperature(*args)
+
+
+def set_top_p(current_model, *args):
+    current_model.set_top_p(*args)
+
+
+def set_n_choices(current_model, *args):
+    current_model.set_n_choices(*args)
+
+
+def set_stop_sequence(current_model, *args):
+    current_model.set_stop_sequence(*args)
+
+
+def set_max_tokens(current_model, *args):
+    current_model.set_max_tokens(*args)
+
+
+def set_presence_penalty(current_model, *args):
+    current_model.set_presence_penalty(*args)
+
+
+def set_frequency_penalty(current_model, *args):
+    current_model.set_frequency_penalty(*args)
+
+
+def set_logit_bias(current_model, *args):
+    current_model.set_logit_bias(*args)
+
+
+def set_user_identifier(current_model, *args):
+    current_model.set_user_identifier(*args)
+
+
+def set_single_turn(current_model, *args):
+    current_model.set_single_turn(*args)
+
+
+def handle_file_upload(current_model, *args):
+    return current_model.handle_file_upload(*args)
+
+
+def like(current_model, *args):
+    return current_model.like(*args)
+
+
+def dislike(current_model, *args):
+    return current_model.dislike(*args)
 
 
 def count_token(message):
@@ -93,20 +208,20 @@ def convert_mdtext(md_text):
     non_code_parts = code_block_pattern.split(md_text)[::2]
 
     result = []
+    raw = f'<div class="raw-message hideM">{html.escape(md_text)}</div>'
     for non_code, code in zip(non_code_parts, code_blocks + [""]):
         if non_code.strip():
             non_code = normalize_markdown(non_code)
-            if inline_code_pattern.search(non_code):
-                result.append(markdown(non_code, extensions=["tables"]))
-            else:
-                result.append(mdtex2html.convert(non_code, extensions=["tables"]))
+            result.append(markdown(non_code, extensions=["tables"]))
         if code.strip():
             code = f"\n```{code}\n\n```"
             code = markdown_to_html_with_syntax_highlight(code)
             result.append(code)
     result = "".join(result)
-    result += ALREADY_CONVERTED_MARK
-    return result
+    output = f'<div class="md-message">{result}</div>'
+    output += raw
+    output += ALREADY_CONVERTED_MARK
+    return output
 
 
 def convert_asis(userinput):
@@ -117,10 +232,13 @@ def convert_asis(userinput):
 
 
 def detect_converted_mark(userinput):
-    if userinput.endswith(ALREADY_CONVERTED_MARK):
+    try:
+        if userinput.endswith(ALREADY_CONVERTED_MARK):
+            return True
+        else:
+            return False
+    except:
         return True
-    else:
-        return False
 
 
 def detect_language(code):
@@ -150,12 +268,15 @@ def construct_assistant(text):
 
 
 def save_file(filename, system, history, chatbot, user_name):
-    logging.debug(f"Saving {user_name}'s conversation history")
+    logging.debug(f"Saving {user_name}'s conversation history to {filename}")
     os.makedirs(os.path.join(HISTORY_DIR, user_name), exist_ok=True)
     if filename.endswith(".json"):
         json_s = {"system": system, "history": history, "chatbot": chatbot}
-        print(json_s)
-        with open(os.path.join(HISTORY_DIR, user_name, filename), "w") as f:
+        if "/" in filename or "\\" in filename:
+            history_file_path = filename
+        else:
+            history_file_path = os.path.join(HISTORY_DIR, user_name, filename)
+        with open(history_file_path, "w") as f:
             json.dump(json_s, f)
     elif filename.endswith(".md"):
         md_s = f"system: \n- {system} \n"
@@ -165,25 +286,30 @@ def save_file(filename, system, history, chatbot, user_name):
             os.path.join(HISTORY_DIR, user_name, filename), "w", encoding="utf8"
         ) as f:
             f.write(md_s)
-    logging.debug(f"{user_name}'s conversation history saved")
+    logging.debug(f"Saved {user_name}'s conversation history successfully")
     return os.path.join(HISTORY_DIR, user_name, filename)
 
 
-def get_file_names(directory: Union[str, Path] = None, plain=False, filetypes=None):
-    logging.debug(
-        f"Get a list of file names, the directory is {directory}, the file type is {filetypes}, whether it is a plain text list {plain}"
-    )
+def sorted_by_pinyin(data):
+    return sorted(data, key=lambda char: lazy_pinyin(char)[0][0])
+
+
+def get_file_names(directory, plain=False, filetypes: List[str] = None):
     if filetypes is None:
         filetypes = [".json"]
+    logging.debug(
+        f"Get the list of file names, the directory is {directory}, the file type is {filetypes}, whether it is a plain text list {plain}"
+    )
     files = []
     try:
-        for file_type in filetypes:
-            files += [f for f in os.listdir(directory) if f.endswith(file_type)]
+        for filetype in filetypes:
+            files += [f for f in os.listdir(directory) if f.endswith(filetype)]
     except FileNotFoundError:
         files = []
+    files = sorted_by_pinyin(files)
     if files is None:
         files = [""]
-    logging.debug(f"files are:{files}")
+    logging.debug(f"Files are:{files}")
     if plain:
         return files
     else:
@@ -192,13 +318,15 @@ def get_file_names(directory: Union[str, Path] = None, plain=False, filetypes=No
 
 def get_history_names(plain=False, user_name=""):
     logging.debug(f"Get list of history filenames from user {user_name}")
-    return get_file_names(os.path.join(HISTORY_DIR, user_name), plain)
+    if user_name == "" and hide_history_when_not_logged_in:
+        return ""
+    else:
+        return get_file_names(os.path.join(HISTORY_DIR, user_name), plain)
 
 
 def load_template(filename, mode=0):
     logging.debug(
-        f"Load the template file {filename}, the mode is {mode} (0 is to return the dictionary and drop-down menu, "
-        f"1 is to return the drop-down menu, 2 is to return the dictionary)"
+        f"Load the template file {filename}, the mode is {mode} (0 is to return the dictionary and drop-down menu, 1 is to return the drop-down menu, 2 is to return the dictionary)"
     )
     lines = []
     if filename.endswith(".json"):
@@ -212,21 +340,18 @@ def load_template(filename, mode=0):
             reader = csv.reader(csvfile)
             lines = list(reader)
         lines = lines[1:]
-    return lines
-    # if mode == 1:
-    #     return sorted_by_pinyin([row[0] for row in lines])
-    # elif mode == 2:
-    #     return {row[0]: row[1] for row in lines}
-    # else:
-    #     choices = sorted_by_pinyin([row[0] for row in lines])
-    #     return {row[0]: row[1] for row in lines}, gr.Dropdown.update(
-    #         choices=choices
-    #     )
+    if mode == 1:
+        return sorted_by_pinyin([row[0] for row in lines])
+    elif mode == 2:
+        return {row[0]: row[1] for row in lines}
+    else:
+        choices = sorted_by_pinyin([row[0] for row in lines])
+        return {row[0]: row[1] for row in lines}, gr.Dropdown.update(choices=choices)
 
 
 def get_template_names(plain=False):
     logging.debug("Get a list of template filenames")
-    return get_file_names(TEMPLATES_DIR, plain, filetypes=[".csv", "json"])
+    return get_file_names(TEMPLATES_DIR, plain, filetypes=[".csv", ".json"])
 
 
 def get_template_content(templates, selection, original_system_prompt):
@@ -303,15 +428,19 @@ def get_geoip():
     if "error" in data.keys():
         logging.warning(f"Unable to obtain IP address information. \n{data}")
         if data["reason"] == "RateLimited":
-            return f"Getting IP geolocation failed because the rate limit for detecting IP was reached. Chat functionality may still be available."
+            return i18n("Your IP region: unknown.")
         else:
-            return f"Failed to obtain IP geolocation. Reason: {data['reason']}. You can still use the chat function."
+            return (
+                i18n("Failed to obtain IP geolocation. Reason: ")
+                + f"{data['reason']}"
+                + i18n(". You can still use the chat function.")
+            )
     else:
         country = data["country_name"]
         if country == "China":
             text = "**Your IP region: China. Please check your proxy settings immediately, using the API in an unsupported region may result in your account being banned. **"
         else:
-            text = f"Your IP region: {country}."
+            text = i18n("Your IP region: ") + f"{country}."
         logging.info(text)
         return text
 
@@ -348,7 +477,6 @@ def cancel_outputting():
 
 
 def transfer_input(inputs):
-    # One-time return to reduce latency
     textbox = reset_textbox()
     outputting = start_outputting()
     return (
@@ -369,8 +497,8 @@ def run(command, desc=None, errdesc=None, custom_env=None, live=False):
         if result.returncode != 0:
             raise RuntimeError(
                 f"""{errdesc or 'Error running command'}.
-Command: {command}
-Error code: {result.returncode}"""
+                Command: {command}
+                Error code: {result.returncode}"""
             )
 
         return ""
@@ -383,11 +511,11 @@ Error code: {result.returncode}"""
     )
     if result.returncode != 0:
         message = f"""{errdesc or 'Error running command'}.
-Command: {command}
-Error code: {result.returncode}
-stdout: {result.stdout.decode(encoding="utf8", errors="ignore") if len(result.stdout) > 0 else '<empty>'}
-stderr: {result.stderr.decode(encoding="utf8", errors="ignore") if len(result.stderr) > 0 else '<empty>'}
-"""
+            Command: {command}
+            Error code: {result.returncode}
+            stdout: {result.stdout.decode(encoding="utf8", errors="ignore") if len(result.stdout) > 0 else '<empty>'}
+            stderr: {result.stderr.decode(encoding="utf8", errors="ignore") if len(result.stderr) > 0 else '<empty>'}
+            """
         raise RuntimeError(message)
     return result.stdout.decode(encoding="utf8", errors="ignore")
 
@@ -401,16 +529,16 @@ def versions_html():
         commit_hash = "<none>"
     if commit_hash != "<none>":
         short_commit = commit_hash[0:7]
-        commit_info = f'<a style="text-decoration:none" href="https://github.com/anhphong22/logdev_assistant/commit/{short_commit}">{short_commit}</a>'
+        commit_info = f'<a style="text-decoration:none;color:inherit" href="https://github.com/anhphong22/logdev_assistant/commit/{short_commit}">{short_commit}</a>'
     else:
         commit_info = "unknown \U0001F615"
     return f"""
-Python: <span title="{sys.version}">{python_version}</span>
- • 
-Gradio: {gr.__version__}
- • 
-Commit: {commit_info}
-"""
+        Python: <span title="{sys.version}">{python_version}</span>
+         • 
+        Gradio: {gr.__version__}
+         • 
+        <a style="text-decoration:none;color:inherit" href="https://github.com/anhphong22/logdev_assistant">LogDev Assistant</a>: {commit_info}
+        """
 
 
 def add_source_numbers(lst, source_name="Source", use_source=True):
@@ -431,7 +559,7 @@ def add_details(lst):
     return nodes
 
 
-def sheet_to_string(sheet):
+def sheet_to_string(sheet, sheet_name=None):
     result = []
     for index, row in sheet.iterrows():
         row_string = ""
@@ -444,16 +572,11 @@ def sheet_to_string(sheet):
 
 
 def excel_to_string(file_path):
-    # Read all worksheets in the Excel file
     excel_file = pd.read_excel(file_path, engine="openpyxl", sheet_name=None)
-
-    # Initialize result string
     result = []
 
-    # Loop through each worksheet
-    for _, sheet_data in excel_file.items():
-        # Process the current worksheet and add to the result string
-        result += sheet_to_string(sheet_data)
+    for sheet_name, sheet_data in excel_file.items():
+        result += sheet_to_string(sheet_data, sheet_name=sheet_name)
 
     return result
 
@@ -465,6 +588,55 @@ def get_last_day_of_month(any_day):
     return next_month - datetime.timedelta(days=next_month.day)
 
 
-def get_model_source(model_name):
+def get_model_source(model_name, alternative_source):
     if model_name == "gpt2-medium":
         return "https://huggingface.co/gpt2-medium"
+
+
+def refresh_ui_elements_on_load(current_model, selected_model_name, user_name):
+    current_model.set_user_identifier(user_name)
+    return toggle_like_btn_visibility(selected_model_name), *current_model.auto_load()
+
+
+def toggle_like_btn_visibility(selected_model_name):
+    if selected_model_name == "xmchat":
+        return gr.update(visible=True)
+    else:
+        return gr.update(visible=False)
+
+
+def new_auto_history_filename(dirname):
+    latest_file = get_latest_filepath(dirname)
+    if latest_file:
+        with open(os.path.join(dirname, latest_file), "r") as f:
+            if len(f.read()) == 0:
+                return latest_file
+    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return f"{now}.json"
+
+
+def get_latest_filepath(dirname):
+    pattern = re.compile(r"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}")
+    latest_time = None
+    latest_file = None
+    for filename in os.listdir(dirname):
+        if os.path.isfile(os.path.join(dirname, filename)):
+            match = pattern.search(filename)
+            if match and match.group(0) == filename[:19]:
+                time_str = filename[:19]
+                filetime = datetime.datetime.strptime(time_str, "%Y-%m-%d_%H-%M-%S")
+                if not latest_time or filetime > latest_time:
+                    latest_time = filetime
+                    latest_file = filename
+    return latest_file
+
+
+def get_history_filepath(username):
+    dirname = os.path.join(HISTORY_DIR, username)
+    os.makedirs(dirname, exist_ok=True)
+    latest_file = get_latest_filepath(dirname)
+    if not latest_file:
+        latest_file = new_auto_history_filename(dirname)
+
+    latest_file = os.path.join(dirname, latest_file)
+    return latest_file
