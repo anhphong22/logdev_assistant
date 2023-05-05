@@ -1,7 +1,6 @@
+from logdev.constants import COMPLETION_URL, BALANCE_API_URL, USAGE_API_URL, API_HOST
 import os
 import queue
-
-from logdev.constants import API_HOST, BALANCE_API_URL, COMPLETION_URL, USAGE_API_URL
 
 
 class State:
@@ -10,9 +9,6 @@ class State:
     completion_url = COMPLETION_URL
     balance_api_url = BALANCE_API_URL
     usage_api_url = USAGE_API_URL
-
-    def __init__(self):
-        self.api_key_queue = None
 
     def interrupt(self):
         self.interrupted = True
@@ -31,7 +27,7 @@ class State:
         self.balance_api_url = BALANCE_API_URL
         self.usage_api_url = USAGE_API_URL
         os.environ["OPENAI_API_BASE"] = f"https://{API_HOST}/v1"
-        return
+        return API_HOST
 
     def reset_all(self):
         self.interrupted = False
@@ -49,8 +45,8 @@ class State:
 
         def wrapped(*args, **kwargs):
             api_key = self.api_key_queue.get()
-            args = list(args)[1:]
-            ret = func(api_key, *args, **kwargs)
+            args[0].api_key = api_key
+            ret = func(*args, **kwargs)
             self.api_key_queue.put(api_key)
             return ret
 

@@ -23,6 +23,9 @@ colorama = "^0.4.6"
 llama-index = "0.5.5"
 mdtex2html = "^1.2.0"
 tiktoken = "^0.3.3"
+transformers = "^4.28.1"
+pypinyin = "^0.48.0"
+torch = "^2.0.0"
 
 
 [build-system]

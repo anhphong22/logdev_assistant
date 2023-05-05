@@ -2,9 +2,13 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import pathlib
+import traceback
 from enum import Enum
 
 import colorama
+import gradio as gr
 import tiktoken
 import urllib3
 from duckduckgo_search import ddg
@@ -12,7 +16,20 @@ from llama_index import PromptHelper
 
 from logdev import shared
 from logdev.config import local_embedding, retrieve_proxy
-from logdev.constants import *  # noqa: F401
+from logdev.constants import (
+    BILLING_NOT_APPLICABLE_MSG,
+    DEFAULT_TOKEN_LIMIT,
+    HISTORY_DIR,
+    MODEL_TOKEN_LIMIT,
+    NO_APIKEY_MSG,
+    NO_INPUT_MSG,
+    PROMPT_TEMPLATE,
+    REDUCE_TOKEN_FACTOR,
+    STANDARD_ERROR_MSG,
+    TOKEN_OFFSET,
+    WEBSEARCH_PTOMPT_TEMPLATE,
+    i18n,
+)
 from logdev.llama_func import construct_index
 from logdev.utils import (
     add_details,
@@ -20,7 +37,9 @@ from logdev.utils import (
     construct_assistant,
     construct_user,
     count_token,
+    get_history_filepath,
     hide_middle_chars,
+    new_auto_history_filename,
     replace_today,
     save_file,
 )
@@ -40,7 +59,7 @@ class ModelType(Enum):
             model_type = ModelType.OpenAI
         elif "chatglm" in model_name_lower:
             model_type = ModelType.ChatGLM
-        elif "llama" in model_name_lower:
+        elif "llama" in model_name_lower or "alpaca" in model_name_lower:
             model_type = ModelType.LLaMA
         else:
             model_type = ModelType.Unknown
@@ -74,6 +93,7 @@ class BaseLLMModel:
         self.system_prompt = system_prompt
         self.api_key = None
         self.need_api_key = False
+        self.single_turn = False
 
         self.temperature = temperature
         self.top_p = top_p
@@ -115,14 +135,14 @@ class BaseLLMModel:
 
     def count_token(self, user_input):
         """get token count from input, implement if needed"""
-        logging.warning("token count not implemented, using default")
+        # logging.warning("token count not implemented, using default")
         return len(user_input)
 
     def stream_next_chatbot(self, inputs, chatbot, fake_input=None, display_append=""):
         def get_return_value():
             return chatbot, status_text
 
-        status_text = "Start streaming answers in real time..."
+        status_text = i18n("Start streaming answers in real time...")
         if fake_input:
             chatbot.append((fake_input, ""))
         else:
@@ -130,7 +150,7 @@ class BaseLLMModel:
 
         user_token_count = self.count_token(inputs)
         self.all_token_counts.append(user_token_count)
-        logging.debug(f"Input token quantity: {user_token_count}")
+        logging.debug(f"Count input token: {user_token_count}")
 
         stream_iter = self.get_answer_stream_iter()
 
@@ -166,54 +186,52 @@ class BaseLLMModel:
         status_text = self.token_message()
         return chatbot, status_text
 
-    def predict(
-        self,
-        inputs,
-        chatbot,
-        stream=False,
-        use_websearch=False,
-        files=None,
-        reply_language="vi",
-        should_check_token_count=True,
-    ):  # repetition_penalty, top_k
-        from langchain.chat_models import ChatOpenAI
-        from langchain.embeddings.huggingface import HuggingFaceEmbeddings
-        from llama_index import (
-            GPTSimpleVectorIndex,
-            LangchainEmbedding,
-            OpenAIEmbedding,
-            ServiceContext,
-        )
-        from llama_index.indices.query.schema import QueryBundle
-        from llama_index.indices.vector_store.base_query import GPTVectorStoreIndexQuery
-
-        logging.info(
-            "Enter：" + colorama.Fore.BLUE + f"{inputs}" + colorama.Style.RESET_ALL
-        )
-        if should_check_token_count:
-            yield chatbot + [(inputs, "")], "Start generating answers..."
-        if reply_language == "Follow problem language (unstable)":
-            reply_language = (
-                "the same language as the question, such as English, Vietnamese, etc."
-            )
-        old_inputs = None
-        display_reference = []
-        limited_context = False
+    def handle_file_upload(self, files, chatbot):
+        """if the model accepts multiple model input, implement this function"""
+        status = gr.Markdown.update()
         if files:
+            construct_index(self.api_key, file_src=files)
+            status = "index build completed"
+        return gr.Files.update(), chatbot, status
+
+    def prepare_inputs(
+        self, real_inputs, use_websearch, files, reply_language, chatbot
+    ):
+        fake_inputs = None
+        display_append = []
+        limited_context = False
+        fake_inputs = real_inputs
+        if files:
+            from langchain.chat_models import ChatOpenAI
+            from langchain.embeddings.huggingface import HuggingFaceEmbeddings
+            from llama_index import (
+                GPTSimpleVectorIndex,
+                LangchainEmbedding,
+                OpenAIEmbedding,
+                ServiceContext,
+            )
+            from llama_index.indices.query.schema import QueryBundle
+            from llama_index.indices.vector_store.base_query import (
+                GPTVectorStoreIndexQuery,
+            )
+
             limited_context = True
-            old_inputs = inputs
-            msg = "Loading index... (this may take a few minutes)"
+            msg = "Loading index..."
             logging.info(msg)
-            yield chatbot + [(inputs, "")], msg
+            # yield chatbot + [(inputs, "")], msg
             index = construct_index(self.api_key, file_src=files)
-            assert index is not None, "Build index failed"
-            msg = "The index construction is complete, and the answer is being obtained..."
-            if local_embedding:
-                embed_model = LangchainEmbedding(HuggingFaceEmbeddings())
+            assert index is not None, "Failed to get index"
+            msg = "Index fetched successfully, generating answer..."
+            logging.info(msg)
+            if local_embedding or self.model_type != ModelType.OpenAI:
+                embed_model = LangchainEmbedding(
+                    HuggingFaceEmbeddings(
+                        model_name="sentence-transformers/distiluse-base-multilingual-cased-v2"
+                    )
+                )
             else:
                 embed_model = OpenAIEmbedding()
-            logging.info(msg)
-            yield chatbot + [(inputs, "")], msg
+            # yield chatbot + [(inputs, "")], msg
             with retrieve_proxy():
                 prompt_helper = PromptHelper(
                     max_input_size=4096,
@@ -232,41 +250,82 @@ class BaseLLMModel:
                     similarity_top_k=5,
                     vector_store=index._vector_store,
                     docstore=index._docstore,
+                    response_synthesizer=None,
                 )
-                query_bundle = QueryBundle(inputs)
+                query_bundle = QueryBundle(real_inputs)
                 nodes = query_object.retrieve(query_bundle)
             reference_results = [n.node.text for n in nodes]
             reference_results = add_source_numbers(reference_results, use_source=False)
-            display_reference = add_details(reference_results)
-            display_reference = "\n\n" + "".join(display_reference)
-            inputs = (
+            display_append = add_details(reference_results)
+            display_append = "\n\n" + "".join(display_append)
+            real_inputs = (
                 replace_today(PROMPT_TEMPLATE)
-                .replace("{query_str}", inputs)
+                .replace("{query_str}", real_inputs)
                 .replace("{context_str}", "\n\n".join(reference_results))
                 .replace("{reply_language}", reply_language)
             )
         elif use_websearch:
             limited_context = True
-            search_results = ddg(inputs, max_results=5)
-            old_inputs = inputs
+            search_results = ddg(real_inputs, max_results=5)
             reference_results = []
             for idx, result in enumerate(search_results):
-                logging.debug(f"Search Results: {idx + 1}：{result}")
+                logging.debug(f"Search result {idx + 1}: {result}")
                 domain_name = urllib3.util.parse_url(result["href"]).host
                 reference_results.append([result["body"], result["href"]])
-                display_reference.append(
-                    f"{idx + 1}. [{domain_name}]({result['href']})\n"
+                display_append.append(
+                    # f"{idx+1}. [{domain_name}]({result['href']})\n"
+                    f"<li><a href=\"{result['href']}\" target=\"_blank\">{domain_name}</a></li>\n"
                 )
             reference_results = add_source_numbers(reference_results)
-            display_reference = "\n\n" + "".join(display_reference)
-            inputs = (
+            display_append = "<ol>\n\n" + "".join(display_append) + "</ol>"
+            real_inputs = (
                 replace_today(WEBSEARCH_PTOMPT_TEMPLATE)
-                .replace("{query}", inputs)
+                .replace("{query}", real_inputs)
                 .replace("{web_results}", "\n\n".join(reference_results))
                 .replace("{reply_language}", reply_language)
             )
         else:
-            display_reference = ""
+            display_append = ""
+        return limited_context, fake_inputs, display_append, real_inputs, chatbot
+
+    def predict(
+        self,
+        inputs,
+        chatbot,
+        stream=False,
+        use_websearch=False,
+        files=None,
+        reply_language="Vietnamese",
+        should_check_token_count=True,
+    ):  # repetition_penalty, top_k
+        status_text = "Starting to generate answers..."
+        logging.info(
+            "The input is: "
+            + colorama.Fore.BLUE
+            + f"{inputs}"
+            + colorama.Style.RESET_ALL
+        )
+        if should_check_token_count:
+            yield chatbot + [(inputs, "")], status_text
+        if reply_language == "Follow question language (unstable)":
+            reply_language = (
+                "the same language as the question, such as English, Vietnamese"
+            )
+
+        (
+            limited_context,
+            fake_inputs,
+            display_append,
+            inputs,
+            chatbot,
+        ) = self.prepare_inputs(
+            real_inputs=inputs,
+            use_websearch=use_websearch,
+            files=files,
+            reply_language=reply_language,
+            chatbot=chatbot,
+        )
+        yield chatbot + [(fake_inputs, "")], status_text
 
         if (
             self.need_api_key
@@ -290,6 +349,9 @@ class BaseLLMModel:
             yield chatbot + [(inputs, "")], status_text
             return
 
+        if self.single_turn:
+            self.history = []
+            self.all_token_counts = []
         self.history.append(construct_user(inputs))
 
         try:
@@ -298,35 +360,38 @@ class BaseLLMModel:
                 iters = self.stream_next_chatbot(
                     inputs,
                     chatbot,
-                    fake_input=old_inputs,
-                    display_append=display_reference,
+                    fake_input=fake_inputs,
+                    display_append=display_append,
                 )
                 for chatbot, status_text in iters:
                     yield chatbot, status_text
             else:
-                logging.debug("Don't use streaming")
+                logging.debug("Do not use streaming")
                 chatbot, status_text = self.next_chatbot_at_once(
                     inputs,
                     chatbot,
-                    fake_input=old_inputs,
-                    display_append=display_reference,
+                    fake_input=fake_inputs,
+                    display_append=display_append,
                 )
                 yield chatbot, status_text
         except Exception as e:
+            traceback.print_exc()
             status_text = STANDARD_ERROR_MSG + str(e)
             yield chatbot, status_text
 
         if len(self.history) > 1 and self.history[-1]["content"] != inputs:
             logging.info(
-                "Answer："
+                "Answer as："
                 + colorama.Fore.BLUE
                 + f"{self.history[-1]['content']}"
                 + colorama.Style.RESET_ALL
             )
 
         if limited_context:
-            self.history = self.history[-4:]
-            self.all_token_counts = self.all_token_counts[-2:]
+            # self.history = self.history[-4:]
+            # self.all_token_counts = self.all_token_counts[-2:]
+            self.history = []
+            self.all_token_counts = []
 
         max_token = self.token_upper_limit - TOKEN_OFFSET
 
@@ -340,9 +405,11 @@ class BaseLLMModel:
                 count += 1
                 del self.all_token_counts[0]
                 del self.history[:2]
-            status_text = f"To prevent token overruns, the model forgets {count} rounds of dialogue earlier"
             logging.info(status_text)
+            status_text = f"To prevent token overrun, the model forgets {count} rounds of dialogue earlier"
             yield chatbot, status_text
+
+        self.auto_save(chatbot)
 
     def retry(
         self,
@@ -352,14 +419,17 @@ class BaseLLMModel:
         files=None,
         reply_language="Vietnamese",
     ):
-        logging.debug("Retrying...")
-        if len(self.history) == 0:
-            yield chatbot, f"{STANDARD_ERROR_MSG}. Context is empty !!!"
+        logging.debug("Retrying……")
+        if len(self.history) > 0:
+            inputs = self.history[-2]["content"]
+            del self.history[-2:]
+            self.all_token_counts.pop()
+        elif len(chatbot) > 0:
+            inputs = chatbot[-1][0]
+        else:
+            yield chatbot, f"{STANDARD_ERROR_MSG}"
             return
 
-        inputs = self.history[-2]["content"]
-        del self.history[-2:]
-        self.all_token_counts.pop()
         iters = self.predict(
             inputs,
             chatbot,
@@ -370,7 +440,7 @@ class BaseLLMModel:
         )
         for x in iters:
             yield x
-        logging.debug("Retry completed")
+        logging.debug("Retry Completion")
 
     def interrupt(self):
         self.interrupted = True
@@ -423,14 +493,26 @@ class BaseLLMModel:
 
     def set_key(self, new_access_key):
         self.api_key = new_access_key.strip()
-        msg = f"API key changed to {hide_middle_chars(self.api_key)}"
+        msg = i18n("API key changed to") + hide_middle_chars(self.api_key)
         logging.info(msg)
-        return msg
+        return self.api_key, msg
+
+    def set_single_turn(self, new_single_turn):
+        self.single_turn = new_single_turn
 
     def reset(self):
         self.history = []
         self.all_token_counts = []
         self.interrupted = False
+        pathlib.Path(
+            os.path.join(
+                HISTORY_DIR,
+                self.user_identifier,
+                new_auto_history_filename(
+                    os.path.join(HISTORY_DIR, self.user_identifier)
+                ),
+            )
+        ).touch()
         return [], self.token_message([0])
 
     def delete_first_conversation(self):
@@ -462,7 +544,12 @@ class BaseLLMModel:
         token_sum = 0
         for i in range(len(token_lst)):
             token_sum += sum(token_lst[: i + 1])
-        return f"Token count: {sum(token_lst)}, this conversation has consumed {token_sum} tokens"
+        return (
+            i18n("Token count: ")
+            + f"{sum(token_lst)}"
+            + i18n(", the cumulative consumption of this conversation ")
+            + f"{token_sum} tokens"
+        )
 
     def save_chat_history(self, filename, chatbot, user_name):
         if filename == "":
@@ -471,6 +558,16 @@ class BaseLLMModel:
             filename += ".json"
         return save_file(filename, self.system_prompt, self.history, chatbot, user_name)
 
+    def auto_save(self, chatbot):
+        history_file_path = get_history_filepath(self.user_identifier)
+        save_file(
+            history_file_path,
+            self.system_prompt,
+            self.history,
+            chatbot,
+            self.user_identifier,
+        )
+
     def export_markdown(self, filename, chatbot, user_name):
         if filename == "":
             return
@@ -478,12 +575,17 @@ class BaseLLMModel:
             filename += ".md"
         return save_file(filename, self.system_prompt, self.history, chatbot, user_name)
 
-    def load_chat_history(self, filename, chatbot, user_name):
-        logging.debug(f"Loading conversation history... {user_name} ")
-        if type(filename) != str:
+    def load_chat_history(self, filename, user_name):
+        logging.debug(f"Loading {user_name}'s conversation history ...")
+        logging.info(f"filename: {filename}")
+        if type(filename) != str and filename is not None:
             filename = filename.name
         try:
-            with open(os.path.join(HISTORY_DIR, user_name, filename), "r") as f:
+            if "/" not in filename:
+                history_file_path = os.path.join(HISTORY_DIR, user_name, filename)
+            else:
+                history_file_path = filename
+            with open(history_file_path, "r") as f:
                 json_s = json.load(f)
             try:
                 if type(json_s["history"][0]) == str:
@@ -497,13 +599,28 @@ class BaseLLMModel:
                     json_s["history"] = new_history
                     logging.info(new_history)
             except:
-                # no conversation history
                 pass
             logging.debug(f"{user_name}'s conversation history loaded")
             self.history = json_s["history"]
-            return filename, json_s["system"], json_s["chatbot"]
-        except FileNotFoundError:
-            logging.warning(
-                f"{user_name}'s conversation history file not found, no action"
-            )
-            return filename, self.system_prompt, chatbot
+            return os.path.basename(filename), json_s["system"], json_s["chatbot"]
+        except:
+            logging.info(f"No conversation history found {filename}")
+            return gr.update(), self.system_prompt, gr.update()
+
+    def auto_load(self):
+        if self.user_identifier == "":
+            self.reset()
+            return self.system_prompt, gr.update()
+        history_file_path = get_history_filepath(self.user_identifier)
+        filename, system_prompt, chatbot = self.load_chat_history(
+            history_file_path, self.user_identifier
+        )
+        return system_prompt, chatbot
+
+    def like(self):
+        """like the last response, implement if needed"""
+        return gr.update()
+
+    def dislike(self):
+        """dislike the last response, implement if needed"""
+        return gr.update()
