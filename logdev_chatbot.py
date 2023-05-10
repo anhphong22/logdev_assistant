@@ -477,7 +477,7 @@ logging.info(
     + "\nLogDev's warm reminder: Visit http://localhost:7860 to view the interface"
     + colorama.Style.RESET_ALL
 )
-demo.title = i18n("LogDev Platform 🌌")
+demo.title = i18n("LogDev Platform")
 
 if __name__ == "__main__":
     reload_javascript()

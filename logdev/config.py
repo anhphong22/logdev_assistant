@@ -183,4 +183,4 @@ try:
 except ValueError:
     pass
 
-share = config.get("share", False)
+share = config.get("share", True)
